@@ -1,6 +1,7 @@
 # Legal documents and vector store — large, re-downloadable
 data/raw/
 data/chroma_db/
+.claude/*
 
 # Python
 __pycache__/

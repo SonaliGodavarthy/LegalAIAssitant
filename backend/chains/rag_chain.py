@@ -9,22 +9,22 @@ from config import settings, PROJECT_ROOT as _ROOT
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_ollama import ChatOllama
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
-SYSTEM_PROMPT = """You are a German legal expert assistant. Answer questions using ONLY the provided legal context.
+MAX_HISTORY = 6  # cap at 3 back-and-forths to stay within num_ctx
 
-Rules:
-- Cite the specific law and section when referencing a rule (e.g., "According to §242 BGB...").
-- If the answer is not found in the context, state clearly: "This information is not available in the provided legal documents."
-- Answer in the same language as the user's question (German question → German answer, English question → English answer).
-- Do not speculate or add information not present in the context.
+SYSTEM_PROMPT = """You are a specialist German legal assistant. Your ONLY function is answering questions about German law.
 
-Context:
+STRICT RULES — follow without exception:
+1. SCOPE: If the question is NOT about German law or the German legal system, respond ONLY with: "I can only answer questions about German law. Please ask about BGB, HGB, DSGVO, GG, ArbZG, or KSchG." Do NOT attempt to answer non-legal questions under any circumstances.
+2. GROUNDING: Answer ONLY using the legal context provided below. Do not use outside knowledge.
+3. CITATIONS: Cite the specific law and section (e.g. "According to §242 BGB...").
+4. NOT FOUND: If the answer is not in the context, say: "This information is not available in the provided legal documents."
+5. LANGUAGE: Detect the language of the user's latest message and reply in that EXACT language. English question → English answer. German question → German answer. Never switch languages mid-conversation.
+6. No speculation. No information beyond what the context contains.
+
+Legal Context:
 {context}"""
-
-HUMAN_PROMPT = "{question}"
 
 
 def _format_docs(docs) -> str:
@@ -37,14 +37,11 @@ def _format_docs(docs) -> str:
 def build_chain():
     chroma_dir = _ROOT / settings.CHROMA_PERSIST_DIR
     embeddings = HuggingFaceEmbeddings(model_name=settings.EMBED_MODEL)
-
     vector_store = Chroma(
         collection_name=settings.COLLECTION_NAME,
         embedding_function=embeddings,
         persist_directory=str(chroma_dir),
     )
-    retriever = vector_store.as_retriever(search_kwargs={"k": settings.TOP_K})
-
     llm = ChatOllama(
         model=settings.LLM_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
@@ -52,77 +49,69 @@ def build_chain():
         num_ctx=settings.OLLAMA_NUM_CTX,
         num_predict=settings.OLLAMA_NUM_PREDICT,
     )
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        ("human", HUMAN_PROMPT),
-    ])
-
-    chain = (
-        {"context": retriever | _format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
-
-    return chain, retriever, llm, prompt
+    return vector_store, llm
 
 
-_chain = None
-_retriever = None
-_llm = None
-_prompt = None
+_vector_store: "Chroma | None" = None
+_llm: "ChatOllama | None" = None
 
 
 def _ensure_loaded():
-    global _chain, _retriever, _llm, _prompt
-    if _chain is None:
-        _chain, _retriever, _llm, _prompt = build_chain()
+    global _vector_store, _llm
+    if _vector_store is None:
+        _vector_store, _llm = build_chain()
 
 
-def query(question: str) -> dict:
-    _ensure_loaded()
-    source_docs = _retriever.invoke(question)
-    answer = _chain.invoke(question)
-    sources = [
-        {
-            "law": doc.metadata.get("law", "unknown"),
-            "source": doc.metadata.get("source", "unknown"),
-            "language": doc.metadata.get("language", "unknown"),
-        }
-        for doc in source_docs
-    ]
-    seen = set()
-    unique_sources = []
-    for s in sources:
-        key = (s["law"], s["source"])
-        if key not in seen:
-            seen.add(key)
-            unique_sources.append(s)
-
-    return {"answer": answer, "sources": unique_sources}
+def _get_retriever(law_filter: str | None = None):
+    search_kwargs: dict = {"k": settings.TOP_K}
+    if law_filter:
+        search_kwargs["filter"] = {"law": law_filter.lower()}
+    return _vector_store.as_retriever(search_kwargs=search_kwargs)
 
 
-async def async_query_stream(question: str):
-    """Async generator that yields LLM tokens then a final [SOURCES] event."""
-    _ensure_loaded()
+def _build_messages(context: str, question: str, history: list[dict]) -> list:
+    msgs: list = [SystemMessage(content=SYSTEM_PROMPT.format(context=context))]
+    for h in history[-MAX_HISTORY:]:
+        role, content = h.get("role", ""), h.get("content", "")
+        if role == "user":
+            msgs.append(HumanMessage(content=content))
+        elif role == "assistant":
+            msgs.append(AIMessage(content=content))
+    msgs.append(HumanMessage(content=question))
+    return msgs
 
-    source_docs = await _retriever.ainvoke(question)
-    context = _format_docs(source_docs)
 
+def _dedup_sources(source_docs) -> list[dict]:
     seen: set = set()
-    unique_sources: list = []
+    unique: list = []
     for doc in source_docs:
         key = (doc.metadata.get("law"), doc.metadata.get("source"))
         if key not in seen:
             seen.add(key)
-            unique_sources.append({
+            unique.append({
                 "law": doc.metadata.get("law", "unknown"),
                 "source": doc.metadata.get("source", "unknown"),
                 "language": doc.metadata.get("language", "unknown"),
             })
+    return unique
 
-    messages = _prompt.format_messages(context=context, question=question)
+
+def query(question: str, law_filter: str | None = None, history: list[dict] | None = None) -> dict:
+    _ensure_loaded()
+    source_docs = _get_retriever(law_filter).invoke(question)
+    messages = _build_messages(_format_docs(source_docs), question, history or [])
+    response = _llm.invoke(messages)
+    answer = response.content if hasattr(response, "content") else str(response)
+    return {"answer": answer, "sources": _dedup_sources(source_docs)}
+
+
+async def async_query_stream(question: str, law_filter: str | None = None, history: list[dict] | None = None):
+    """Async generator: yields LLM tokens then a final [SOURCES] SSE event."""
+    _ensure_loaded()
+    source_docs = await _get_retriever(law_filter).ainvoke(question)
+    messages = _build_messages(_format_docs(source_docs), question, history or [])
+    unique_sources = _dedup_sources(source_docs)
+
     async for chunk in _llm.astream(messages):
         content = chunk.content if hasattr(chunk, "content") else str(chunk)
         if content:

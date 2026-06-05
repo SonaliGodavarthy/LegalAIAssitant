@@ -1,36 +1,27 @@
 "use client";
 
 import { useRef, useEffect } from "react";
-import type { QueryState } from "@/types";
 
 interface QuestionInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
-  state: QueryState;
+  disabled: boolean;
 }
-
-const SAMPLE_QUESTIONS = [
-  "What are the rules for contract termination under German law?",
-  "Welche Rechte haben Arbeitnehmer bei einer Kündigung?",
-  "What does the DSGVO say about data subject rights?",
-  "Was regelt §242 BGB über Treu und Glauben?",
-];
 
 export default function QuestionInput({
   value,
   onChange,
   onSubmit,
-  state,
+  disabled,
 }: QuestionInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const isLoading = state === "loading" || state === "streaming";
 
   const autoResize = () => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
   };
 
   useEffect(() => {
@@ -38,28 +29,20 @@ export default function QuestionInput({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !isLoading && value.trim()) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !disabled && value.trim()) {
       e.preventDefault();
       onSubmit();
     }
   };
 
-  const handleSampleClick = (question: string) => {
-    onChange(question);
-    textareaRef.current?.focus();
-  };
-
   return (
-    <div className="space-y-4">
-      {/* Textarea wrapper */}
+    <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-3">
       <div
         className={`
-          relative rounded-2xl border-2 bg-white shadow-legal
-          transition-all duration-200
-          ${
-            isLoading
-              ? "border-navy-300 shadow-glow"
-              : "border-navy-200 hover:border-navy-300 focus-within:border-navy-500 focus-within:shadow-legal-lg"
+          relative rounded-2xl border-2 bg-white transition-all duration-200
+          ${disabled
+            ? "border-navy-200 shadow-sm"
+            : "border-navy-200 hover:border-navy-300 focus-within:border-navy-500 focus-within:shadow-legal"
           }
         `}
       >
@@ -68,123 +51,66 @@ export default function QuestionInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          placeholder="Ask a question about German law in English or German…"
-          rows={3}
-          aria-label="Legal research question"
-          className={`
-            w-full resize-none rounded-2xl bg-transparent px-5 pt-4 pb-12
-            text-navy-900 text-base font-['Inter'] leading-relaxed
+          disabled={disabled}
+          placeholder="Ask a follow-up or new question about German law…"
+          rows={1}
+          aria-label="Legal question"
+          className="
+            w-full resize-none rounded-2xl bg-transparent px-4 pt-3 pb-10
+            text-navy-900 text-sm font-['Inter'] leading-relaxed
             placeholder:text-navy-300
             focus:outline-none
-            disabled:opacity-60 disabled:cursor-not-allowed
+            disabled:opacity-50 disabled:cursor-not-allowed
             custom-scrollbar
-          `}
-          style={{ minHeight: "96px" }}
+          "
+          style={{ minHeight: "44px" }}
         />
 
-        {/* Bottom bar inside textarea */}
-        <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-4 pb-3">
-          <p className="text-[11px] text-navy-300 font-['Inter'] select-none">
-            {value.trim() ? (
-              <span className="text-navy-400">
-                ⌘↵ to search
-              </span>
-            ) : (
-              "Enter your question"
-            )}
-          </p>
-
+        <div className="absolute bottom-0 inset-x-0 flex items-center justify-between px-3 pb-2.5">
+          <span className="text-[11px] text-navy-300 font-['Inter'] select-none">
+            {value.trim() && !disabled ? "⌘↵ to send" : ""}
+          </span>
           <button
             onClick={onSubmit}
-            disabled={!value.trim() || isLoading}
-            aria-label={isLoading ? "Researching…" : "Research this question"}
+            disabled={!value.trim() || disabled}
+            aria-label={disabled ? "Waiting for response…" : "Send question"}
             className={`
-              inline-flex items-center gap-2 px-4 py-1.5 rounded-xl
-              text-sm font-semibold font-['Inter'] tracking-wide
-              transition-all duration-200
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-500 focus-visible:ring-offset-2
-              ${
-                !value.trim() || isLoading
-                  ? "bg-navy-100 text-navy-400 cursor-not-allowed"
-                  : "bg-navy-900 text-white hover:bg-navy-700 active:scale-95 shadow-sm"
+              inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl
+              text-xs font-semibold font-['Inter'] tracking-wide
+              transition-all duration-150
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-500
+              ${!value.trim() || disabled
+                ? "bg-navy-100 text-navy-400 cursor-not-allowed"
+                : "bg-navy-900 text-white hover:bg-navy-700 active:scale-95 shadow-sm"
               }
             `}
           >
-            {isLoading ? (
-              <>
-                <TypingDots />
-                Researching
-              </>
-            ) : (
-              <>
-                <SearchIcon />
-                Research
-              </>
-            )}
+            {disabled ? <LoadingDots /> : <SendIcon />}
+            {disabled ? "Thinking" : "Ask"}
           </button>
         </div>
       </div>
-
-      {/* Sample questions */}
-      {!value && state === "idle" && (
-        <div className="animate-fade-in">
-          <p className="text-xs text-navy-400 font-['Inter'] mb-2">
-            Try asking:
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {SAMPLE_QUESTIONS.map((q) => (
-              <button
-                key={q}
-                onClick={() => handleSampleClick(q)}
-                className="
-                  text-xs text-navy-600 font-['Inter'] px-3 py-1.5
-                  bg-white border border-navy-200 rounded-lg
-                  hover:bg-navy-50 hover:border-navy-300 hover:text-navy-900
-                  transition-all duration-150
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-navy-400
-                  text-left leading-snug
-                "
-              >
-                "{q}"
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-function TypingDots() {
+function SendIcon() {
   return (
-    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
-      {[0, 0.2, 0.4].map((delay, i) => (
-        <span
-          key={i}
-          className="w-1 h-1 bg-current rounded-full animate-typing"
-          style={{ animationDelay: `${delay}s` }}
-        />
-      ))}
-    </span>
+    <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
   );
 }
 
-function SearchIcon() {
+function LoadingDots() {
   return (
-    <svg
-      aria-hidden="true"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.35-4.35" />
-    </svg>
+    <span className="inline-flex items-center gap-0.5" aria-hidden="true">
+      {[0, 0.2, 0.4].map((delay, i) => (
+        <span key={i} className="w-1 h-1 bg-current rounded-full animate-typing"
+          style={{ animationDelay: `${delay}s` }} />
+      ))}
+    </span>
   );
 }

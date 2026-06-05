@@ -11,9 +11,15 @@ export interface Source {
   language: string;
 }
 
-export interface QueryResponse {
-  answer: string;
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
   sources: Source[];
+  streaming: boolean;
 }
 
-export type QueryState = "idle" | "loading" | "streaming" | "done" | "error";
+export interface HistoryItem {
+  role: "user" | "assistant";
+  content: string;
+}

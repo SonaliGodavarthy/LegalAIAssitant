@@ -41,6 +41,8 @@ app.add_middleware(
 
 class QueryRequest(BaseModel):
     question: str
+    law_filter: str | None = None
+    history: list[dict] | None = None
 
     @field_validator("question")
     @classmethod
@@ -74,7 +76,7 @@ def list_laws():
 @app.post("/query", response_model=QueryResponse)
 def query_endpoint(request: QueryRequest):
     try:
-        result = rag_chain.query(request.question)
+        result = rag_chain.query(request.question, request.law_filter, request.history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return QueryResponse(answer=result["answer"], sources=result["sources"])
@@ -84,7 +86,7 @@ def query_endpoint(request: QueryRequest):
 async def query_stream_endpoint(request: QueryRequest):
     async def event_generator():
         try:
-            async for token in rag_chain.async_query_stream(request.question):
+            async for token in rag_chain.async_query_stream(request.question, request.law_filter, request.history):
                 yield _to_sse(token)
         except Exception as e:
             yield _to_sse(f"[ERROR]{str(e)}")
