@@ -1,7 +1,10 @@
 # Legal documents and vector store — large, re-downloadable
 data/raw/
 data/chroma_db/
-.claude/*
+
+# Claude Code tooling — internal only
+.claude/
+CLAUDE.md
 
 # Python
 __pycache__/

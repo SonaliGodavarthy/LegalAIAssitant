@@ -68,6 +68,7 @@ export default function HomePage() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let accumulatedContent = "";
 
       while (true) {
         const { value, done } = await reader.read();
@@ -89,7 +90,9 @@ export default function HomePage() {
           if (!data) continue;
 
           if (data.startsWith("[SOURCES]")) {
-            const sources = JSON.parse(data.slice(9)) as Source[];
+            const rawSources = JSON.parse(data.slice(9)) as Source[];
+            const isRefusal = accumulatedContent.trimStart().startsWith("I can only answer");
+            const sources = isRefusal ? [] : rawSources;
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === asstMsgId ? { ...m, sources, streaming: false } : m
@@ -106,6 +109,7 @@ export default function HomePage() {
             );
             setIsStreaming(false);
           } else {
+            accumulatedContent += data;
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === asstMsgId ? { ...m, content: m.content + data } : m
