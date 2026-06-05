@@ -11,12 +11,14 @@ class Settings(BaseSettings):
     EMBED_MODEL: str = "paraphrase-multilingual-MiniLM-L12-v2"
     CHUNK_SIZE: int = 800
     CHUNK_OVERLAP: int = 100
-    TOP_K: int = 5
-    LLM_MODEL: str = "mistral"
+    TOP_K: int = 3
+    LLM_MODEL: str = "llama3.2:3b"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_NUM_CTX: int = 2048
+    OLLAMA_NUM_PREDICT: int = 512
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
 
-    model_config = {"env_file": str(PROJECT_ROOT / ".env")}
+    model_config = {"env_file": str(PROJECT_ROOT / ".env"), "extra": "ignore"}
 
 
 settings = Settings()

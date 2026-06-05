@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 
 from config import settings, PROJECT_ROOT as _ROOT
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
@@ -49,6 +49,8 @@ def build_chain():
         model=settings.LLM_MODEL,
         base_url=settings.OLLAMA_BASE_URL,
         temperature=0,
+        num_ctx=settings.OLLAMA_NUM_CTX,
+        num_predict=settings.OLLAMA_NUM_PREDICT,
     )
 
     prompt = ChatPromptTemplate.from_messages([
