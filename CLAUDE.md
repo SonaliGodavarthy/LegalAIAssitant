@@ -20,9 +20,11 @@ LegalAIAssistant/
 │   │   └── ingest.py      # One-time PDF → ChromaDB ingestion script
 │   ├── chains/
 │   │   └── rag_chain.py   # LangChain LCEL retrieval + generation chain
+│   ├── tests/
+│   │   └── test_*.py      # pytest suite (40 tests)
 │   └── api/
-│       └── main.py        # FastAPI app (/health, /query)
-├── frontend/              # Next.js app (not yet built)
+│       └── main.py        # FastAPI app (/health, /laws, /query, /query/stream)
+├── frontend/              # Next.js 14 app (TypeScript + Tailwind)
 └── data/
     ├── raw/               # Downloaded PDFs, organised by law name
     │   ├── bgb/           # german_bgb.pdf, english_bgb.pdf
@@ -38,7 +40,7 @@ LegalAIAssistant/
 
 | Component | Tool | Cost |
 |---|---|---|
-| LLM | Ollama (`mistral`) — runs locally | Free |
+| LLM | Ollama (`llama3.2:3b`) — runs locally on Apple Silicon GPU | Free |
 | Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` via sentence-transformers | Free |
 | Vector DB | ChromaDB (local file) | Free |
 | Backend | FastAPI + uvicorn | Free |
@@ -61,10 +63,9 @@ conda activate LegalAI
 pip install -r backend/requirements.txt
 ```
 
-**Ollama** must be running locally as a background service:
+**Ollama** must be running (installed via `brew install --cask ollama`). Open the Ollama app once to start the service, then:
 ```bash
-brew services start ollama      # start on login
-ollama pull mistral             # download model once (~4GB)
+ollama pull llama3.2:3b         # download model once (~2GB)
 ```
 
 ## Development commands
@@ -100,7 +101,7 @@ curl -X POST http://localhost:8000/query \
 
 ## Key conventions
 
-- **RAG flow**: PDF → `ingest.py` chunks + embeds → ChromaDB. At query time: embed question → retrieve top-5 chunks → Mistral generates grounded answer.
+- **RAG flow**: PDF → `ingest.py` chunks + embeds → ChromaDB. At query time: embed question → retrieve top-3 chunks → llama3.2:3b generates grounded answer streamed token-by-token.
 - **LLM config**: model name lives only in `config.py` (`LLM_MODEL`). Change the model there, not in chain code.
 - **Metadata on every chunk**: `law` (e.g. `bgb`), `source` (filename), `language` (`german`/`english`), `page`. Used for source citations in responses.
 - **No hallucination policy**: the system prompt instructs the model to answer only from retrieved context and state explicitly when it cannot find an answer.
