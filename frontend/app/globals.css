@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #fdfaf5;
+    --foreground: #0f1240;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-parchment-50 text-navy-950 antialiased;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  }
+
+  ::selection {
+    @apply bg-navy-200 text-navy-950;
+  }
+}
+
+@layer components {
+  /* Typewriter cursor blink */
+  .typing-cursor::after {
+    content: "▋";
+    @apply text-navy-600 animate-pulse;
+    font-size: 0.9em;
+    margin-left: 1px;
+    vertical-align: -1px;
+  }
+
+  /* Legal citation styling */
+  .legal-cite {
+    @apply font-mono text-sm text-navy-700 bg-navy-50 border border-navy-100 px-2 py-0.5 rounded;
+  }
+
+  /* Prose styling for answer text */
+  .answer-prose {
+    @apply text-navy-900 leading-relaxed;
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  .answer-prose p {
+    @apply mb-4 last:mb-0;
+  }
+
+  .answer-prose strong {
+    @apply font-semibold text-navy-950;
+  }
+
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-parchment-100 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-navy-200 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-navy-300;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-grid-pattern {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(15, 18, 64, 0.06) 1px,
+      transparent 0
+    );
+    background-size: 28px 28px;
+  }
+}

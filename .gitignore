@@ -1,0 +1,21 @@
+# Legal documents and vector store — large, re-downloadable
+data/raw/
+data/chroma_db/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+
+# Environment
+.env
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+
+# macOS
+.DS_Store
